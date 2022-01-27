@@ -66,7 +66,7 @@ func printStatusAndVerify(s []string, d []fs.FileInfo) (bool, error) {
 	reader := bufio.NewReader(os.Stdin)
 	char, _, err := reader.ReadRune()
 	if err != nil {
-		return false, fmt.Errorf("Error getting confirmation. err: %s", err)
+		return false, fmt.Errorf("error getting confirmation. err: %s", err)
 	}
 	if string(char) == "y" {
 		return true, nil
