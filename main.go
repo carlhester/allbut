@@ -11,7 +11,10 @@ import (
 
 func main() {
 	// Parse input
-	protectionCandidates, deleteFlagEnabled := parseArgs(os.Args)
+	// Strip the first argument which is the executable itself
+	args := os.Args[1:]
+
+	protectionCandidates, deleteFlagEnabled := parseArgs(args)
 	if len(protectionCandidates) == 0 {
 		printUsageAndExit()
 	}
@@ -72,16 +75,34 @@ func main() {
 	}
 }
 
-func sanitizeFileNames(files []string) []string {
-	results := []string{}
-	for _, f := range files {
-		if strings.HasPrefix(f, "./") {
-			results = append(results, f)
-		} else {
-			results = append(results, fmt.Sprintf("./%s", f))
-		}
+func removeInvalidChars(i string) string {
+	badChars := "[],~\\!@#$%^&*(){}'<>?;:=+'"
+	toStrip := strings.Split(badChars, "")
+	for _, s := range toStrip {
+		i = strings.Replace(i, string(s), "", -1)
 	}
-	return results
+	return i
+}
+
+func addDotSlashPrefix(i string) string {
+	s := strings.Replace(i, "./", "", -1)
+	return fmt.Sprintf("./%s", s)
+}
+
+func sanitizeFileNames(files []string) []string {
+	r := []string{}
+	stripped := []string{}
+
+	for _, f := range files {
+		p := addDotSlashPrefix(f)
+		stripped = append(stripped, p)
+	}
+
+	for _, f := range stripped {
+		r = append(r, removeInvalidChars(f))
+	}
+
+	return r
 }
 
 func getDeleteConfirmation(count int) (bool, error) {
@@ -153,11 +174,7 @@ func parseArgs(args []string) ([]string, bool) {
 	if len(args) < 2 {
 		return []string{}, false
 	}
-	for i, file := range args {
-		// first argument is the command name
-		if i == 0 {
-			continue
-		}
+	for _, file := range args {
 		if file == "-f" {
 			deletionEnabled = true
 			continue
