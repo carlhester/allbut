@@ -55,7 +55,7 @@ func Setup(args []string) (*allbut, error) {
 func (a *allbut) Run() error {
 	// print status
 	func() {
-		fmt.Println("Protected Files:")
+		fmt.Printf("\nProtected Files:\n")
 		for _, s := range a.toProtect {
 			fmt.Printf("\t%s\n", s)
 		}
@@ -128,20 +128,28 @@ func getDeleteConfirmation(count int) (bool, error) {
 
 func handleDeletions(candidates []string, deletionEnabled bool) error {
 	for _, c := range candidates {
-		if !deletionEnabled {
-			fmt.Println("MOCK deleting ... ", c)
-		}
+		if deletionEnabled {
+			fmt.Println("deleting ", c)
+			err := os.Remove(c)
+			if err != nil { 
+				panic(err)
+			}
+			continue
+		} 
+			fmt.Println("(use -f to delete) MOCK deleting ", c)
+
 	}
 	return nil
 }
 
 func identifyDeletionCandidates(protectedFiles []string, filesInCwd []os.FileInfo) ([]string, error) {
+
 	deletionCandidates := []string{}
 	// Iterate and decide
 	for _, fileInCwd := range filesInCwd {
 		fileProtected := false
 		for _, protectedFile := range protectedFiles {
-			if fileInCwd.Name() == protectedFile {
+			if fileInCwd.Name() == strings.ReplaceAll(protectedFile, "./", "")  {
 				fileProtected = true
 				continue
 			}
