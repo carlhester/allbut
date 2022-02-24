@@ -25,11 +25,16 @@ func Setup(args []string) (*allbut, error) {
 
 	// Sanitize filenames
 	sanitizedFiles := sanitizeFilenames(protectionCandidates)
+	protectedFiles := []string{}
 
-	// validate input files
-	protectedFiles, err := validateFilenames(sanitizedFiles)
-	if err != nil {
-		return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
+	v := validator{}
+
+	for _, f := range sanitizedFiles {
+		err := v.validate(f)
+		if err != nil {
+			return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
+		}
+		protectedFiles = append(protectedFiles, f)
 	}
 
 	// collect files from current directory
@@ -53,13 +58,13 @@ func Setup(args []string) (*allbut, error) {
 }
 
 func (a *allbut) Run() error {
-    if a.deleteEnabled { 
-		err = handleDeletions(a.toDelete, a.deleteEnabled)
+	if a.deleteEnabled {
+		err := handleDeletions(a.toDelete, a.deleteEnabled)
 		if err != nil {
 			return fmt.Errorf("error during deletion. err: %+v", err)
 		}
-        return nil
-    }
+		return nil
+	}
 
 	// print status
 	func() {
@@ -138,12 +143,12 @@ func handleDeletions(candidates []string, deletionEnabled bool) error {
 	for _, c := range candidates {
 		if deletionEnabled {
 			err := os.Remove(c)
-			if err != nil { 
+			if err != nil {
 				panic(err)
 			}
 			continue
-		} 
-			fmt.Println("(use -f to really delete) MOCK deleting ", c)
+		}
+		fmt.Println("(use -f to really delete) MOCK deleting ", c)
 
 	}
 	return nil
@@ -156,7 +161,7 @@ func identifyDeletionCandidates(protectedFiles []string, filesInCwd []os.FileInf
 	for _, fileInCwd := range filesInCwd {
 		fileProtected := false
 		for _, protectedFile := range protectedFiles {
-			if fileInCwd.Name() == strings.ReplaceAll(protectedFile, "./", "")  {
+			if fileInCwd.Name() == strings.ReplaceAll(protectedFile, "./", "") {
 				fileProtected = true
 				continue
 			}
@@ -168,20 +173,23 @@ func identifyDeletionCandidates(protectedFiles []string, filesInCwd []os.FileInf
 	return deletionCandidates, nil
 }
 
-func validateFilenames(files []string) ([]string, error) {
-	for _, file := range files {
-		f, err := os.Stat(file)
+type validator struct {
+}
 
-		// Check that file exists
-		if err != nil {
-			return []string{}, fmt.Errorf("unable to read file: %s", f)
-		}
-		// Check that file is not a directory
-		if f.IsDir() {
-			return []string{}, fmt.Errorf("%s is a directory, not a plain file", f.Name())
-		}
+func (v *validator) Stat(f string) (os.FileInfo, error) {
+	return os.Stat(f)
+}
+
+func (v *validator) validate(file string) error {
+	f, err := v.Stat(file)
+	if err != nil {
+		return fmt.Errorf("unable to read file: %s", f)
 	}
-	return files, nil
+
+	if f.IsDir() {
+		return fmt.Errorf("%s is a directory, not a plain file", f.Name())
+	}
+	return nil
 }
 
 func PrintUsageAndExit() {

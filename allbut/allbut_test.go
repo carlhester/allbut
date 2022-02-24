@@ -1,7 +1,10 @@
 package allbut
 
 import (
+	"io/fs"
+	"os"
 	"testing"
+	"time"
 )
 
 func TestParseArgs(t *testing.T) {
@@ -53,42 +56,42 @@ func TestSanitizeFileNames(t *testing.T) {
 	}
 }
 
-func TestSetup(t *testing.T) {
-	tests := []struct {
-		descr              string
-		args               []string
-		expectedToDelete   []string
-		expectedToProtect  []string
-		expectedDeleteFlag bool
-		expectedErr        bool
-	}{
-		{"success case", []string{"-f", "testfile.txt"}, []string{}, []string{}, false, true},
-		{"no files to protect returns just an error", []string{"-f"}, []string{}, []string{}, false, true},
-	}
+// func TestSetup(t *testing.T) {
+// 	tests := []struct {
+// 		descr              string
+// 		args               []string
+// 		expectedToDelete   []string
+// 		expectedToProtect  []string
+// 		expectedDeleteFlag bool
+// 		expectedErr        bool
+// 	}{
+// 		{"success case", []string{"-f", "testfile.txt"}, []string{}, []string{}, false, true},
+// 		{"no files to protect returns just an error", []string{"-f"}, []string{}, []string{}, false, true},
+// 	}
 
-	for _, tt := range tests {
-		t.Run(tt.descr, func(t *testing.T) {
-			result, err := Setup(tt.args)
+// 	for _, tt := range tests {
+// 		t.Run(tt.descr, func(t *testing.T) {
+// 			result, err := Setup(tt.args)
 
-			if !slicesEqual(result.toDelete, tt.expectedToDelete) {
-				t.Errorf("error. Expected %+v, got %+v", tt.expectedToDelete, result.toDelete)
-			}
+// 			if !slicesEqual(result.toDelete, tt.expectedToDelete) {
+// 				t.Errorf("error. Expected %+v, got %+v", tt.expectedToDelete, result.toDelete)
+// 			}
 
-			if !slicesEqual(result.toProtect, tt.expectedToProtect) {
-				t.Errorf("error. Expected %+v, got %+v", tt.expectedToProtect, result.toProtect)
-			}
+// 			if !slicesEqual(result.toProtect, tt.expectedToProtect) {
+// 				t.Errorf("error. Expected %+v, got %+v", tt.expectedToProtect, result.toProtect)
+// 			}
 
-			if result.deleteEnabled != tt.expectedDeleteFlag {
-				t.Errorf("error. Expected %t, got %t", tt.expectedDeleteFlag, result.deleteEnabled)
-			}
-			if !tt.expectedErr {
-				if err != nil {
-					t.Errorf("error. Expected an error, got %v", err)
-				}
-			}
-		})
-	}
-}
+// 			if result.deleteEnabled != tt.expectedDeleteFlag {
+// 				t.Errorf("error. Expected %t, got %t", tt.expectedDeleteFlag, result.deleteEnabled)
+// 			}
+// 			if !tt.expectedErr {
+// 				if err != nil {
+// 					t.Errorf("error. Expected an error, got %v", err)
+// 				}
+// 			}
+// 		})
+// 	}
+// }
 
 func TestAddDotSlashPrefix(t *testing.T) {
 	tests := []struct {
@@ -145,4 +148,66 @@ func slicesEqual(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+type fakeFileInfo struct {
+	name string
+}
+
+func (f *fakeFileInfo) Name() string {
+	return f.name
+}
+
+func (f *fakeFileInfo) Size() int64 {
+	return 0
+}
+
+func (f *fakeFileInfo) Mode() fs.FileMode {
+	return 0
+}
+
+func (f *fakeFileInfo) ModTime() time.Time {
+	return time.Now()
+}
+
+func (f *fakeFileInfo) IsDir() bool {
+	return false
+}
+func (f *fakeFileInfo) Sys() interface{} {
+	return 0
+}
+
+func TestIdentifyDeletionCandidates(t *testing.T) {
+	fakeCwdFiles := []os.FileInfo{
+		&fakeFileInfo{name: "fake1"},
+		&fakeFileInfo{name: "fake2"},
+		&fakeFileInfo{name: "fake3"},
+		&fakeFileInfo{name: "fake4"},
+	}
+
+	tests := []struct {
+		desc           string
+		protectedFiles []string
+		filesInCwd     []fs.FileInfo
+		expectedResult []string
+		expectedErr    error
+	}{
+		{"one matched file", []string{"fake1"}, fakeCwdFiles, []string{"fake2", "fake3", "fake4"}, nil},
+		{"two matched files", []string{"fake1", "fake2"}, fakeCwdFiles, []string{"fake3", "fake4"}, nil},
+		{"zero matched files", []string{"no_matched_file"}, fakeCwdFiles, []string{"fake1", "fake2", "fake3", "fake4"}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+
+			result, err := identifyDeletionCandidates(tt.protectedFiles, tt.filesInCwd)
+			if err != tt.expectedErr {
+				t.Errorf("error. Expected: %+v. Got: %+v", tt.expectedErr, err)
+			}
+
+			if !slicesEqual(tt.expectedResult, result) {
+				t.Errorf("error. Expected: %+v. Got: %+v", tt.expectedResult, result)
+			}
+		})
+	}
 }
