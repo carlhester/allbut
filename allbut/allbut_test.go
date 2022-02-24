@@ -45,9 +45,46 @@ func TestSanitizeFileNames(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.descr, func(t *testing.T) {
-			result := sanitizeFileNames(tt.input)
+			result := sanitizeFilenames(tt.input)
 			if !slicesEqual(result, tt.output) {
 				t.Errorf("Error.  Expected: [%s]. Got: [%s]", tt.output, result)
+			}
+		})
+	}
+}
+
+func TestSetup(t *testing.T) {
+	tests := []struct {
+		descr              string
+		args               []string
+		expectedToDelete   []string
+		expectedToProtect  []string
+		expectedDeleteFlag bool
+		expectedErr        bool
+	}{
+		{"success case", []string{"-f", "testfile.txt"}, []string{}, []string{}, false, true},
+		{"no files to protect returns just an error", []string{"-f"}, []string{}, []string{}, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.descr, func(t *testing.T) {
+			result, err := Setup(tt.args)
+
+			if !slicesEqual(result.toDelete, tt.expectedToDelete) {
+				t.Errorf("error. Expected %+v, got %+v", tt.expectedToDelete, result.toDelete)
+			}
+
+			if !slicesEqual(result.toProtect, tt.expectedToProtect) {
+				t.Errorf("error. Expected %+v, got %+v", tt.expectedToProtect, result.toProtect)
+			}
+
+			if result.deleteEnabled != tt.expectedDeleteFlag {
+				t.Errorf("error. Expected %t, got %t", tt.expectedDeleteFlag, result.deleteEnabled)
+			}
+			if !tt.expectedErr {
+				if err != nil {
+					t.Errorf("error. Expected an error, got %v", err)
+				}
 			}
 		})
 	}

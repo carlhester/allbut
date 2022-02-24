@@ -18,16 +18,16 @@ type allbut struct {
 func Setup(args []string) (*allbut, error) {
 	// Parse input
 	// Strip the first argument which is the executable itself
-	protectionCandidates, deleteFlagEnabled := parseArgs(args)
+	protectionCandidates, deleteEnabled := parseArgs(args)
 	if len(protectionCandidates) == 0 {
 		return &allbut{}, fmt.Errorf("%d files to protect. Provide an argument", len(protectionCandidates))
 	}
 
-	// Sanitize files
-	sanitizedFiles := sanitizeFileNames(protectionCandidates)
+	// Sanitize filenames
+	sanitizedFiles := sanitizeFilenames(protectionCandidates)
 
 	// validate input files
-	protectedFiles, err := validateFiles(sanitizedFiles)
+	protectedFiles, err := validateFilenames(sanitizedFiles)
 	if err != nil {
 		return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
 	}
@@ -44,15 +44,23 @@ func Setup(args []string) (*allbut, error) {
 		return &allbut{}, err
 	}
 
-	deletionTargets := sanitizeFileNames(deletionCandidates)
+	deletionTargets := sanitizeFilenames(deletionCandidates)
 	return &allbut{
 		toDelete:      deletionTargets,
 		toProtect:     protectedFiles,
-		deleteEnabled: deleteFlagEnabled,
+		deleteEnabled: deleteEnabled,
 	}, nil
 }
 
 func (a *allbut) Run() error {
+    if a.deleteEnabled { 
+		err = handleDeletions(a.toDelete, a.deleteEnabled)
+		if err != nil {
+			return fmt.Errorf("error during deletion. err: %+v", err)
+		}
+        return nil
+    }
+
 	// print status
 	func() {
 		fmt.Printf("\nProtected Files:\n")
@@ -97,7 +105,7 @@ func addDotSlashPrefix(i string) string {
 	return fmt.Sprintf("./%s", s)
 }
 
-func sanitizeFileNames(files []string) []string {
+func sanitizeFilenames(files []string) []string {
 	r := []string{}
 	stripped := []string{}
 
@@ -129,14 +137,13 @@ func getDeleteConfirmation(count int) (bool, error) {
 func handleDeletions(candidates []string, deletionEnabled bool) error {
 	for _, c := range candidates {
 		if deletionEnabled {
-			fmt.Println("deleting ", c)
 			err := os.Remove(c)
 			if err != nil { 
 				panic(err)
 			}
 			continue
 		} 
-			fmt.Println("(use -f to delete) MOCK deleting ", c)
+			fmt.Println("(use -f to really delete) MOCK deleting ", c)
 
 	}
 	return nil
@@ -161,7 +168,7 @@ func identifyDeletionCandidates(protectedFiles []string, filesInCwd []os.FileInf
 	return deletionCandidates, nil
 }
 
-func validateFiles(files []string) ([]string, error) {
+func validateFilenames(files []string) ([]string, error) {
 	for _, file := range files {
 		f, err := os.Stat(file)
 
