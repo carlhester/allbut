@@ -15,7 +15,41 @@ type allbut struct {
 	deleteEnabled bool
 }
 
+type cwdCollector struct { 
+}
+
+func (c *cwdCollector) collect() ([]os.FileInfo, error) { 
+	return ioutil.ReadDir("./")
+}
+
+type sanitizer struct {} 
+
+func (s *sanitizer) sanitizeFilenames(files []string) []string{ 
+	r := []string{}
+	stripped := []string{}
+
+	for _, f := range files {
+		p := addDotSlashPrefix(f)
+		stripped = append(stripped, p)
+	}
+
+	for _, f := range stripped {
+		r = append(r, removeInvalidChars(f))
+	}
+
+	return r
+}
+
+
+
 func Setup(args []string) (*allbut, error) {
+
+	s := sanitizer{}
+//	p := parser{}
+	v := validator{}
+	c := cwdCollector{}
+	
+
 	// Parse input
 	// Strip the first argument which is the executable itself
 	protectionCandidates, deleteEnabled := parseArgs(args)
@@ -24,21 +58,18 @@ func Setup(args []string) (*allbut, error) {
 	}
 
 	// Sanitize filenames
-	sanitizedFiles := sanitizeFilenames(protectionCandidates)
+	sanitizedFiles := s.sanitizeFilenames(protectionCandidates)
 	protectedFiles := []string{}
 
-	v := validator{}
 
-	for _, f := range sanitizedFiles {
-		err := v.validate(f)
-		if err != nil {
-			return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
-		}
-		protectedFiles = append(protectedFiles, f)
+	err := v.validate(sanitizedFiles)
+	if err != nil {
+		return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
 	}
+	protectedFiles = sanitizedFiles
 
+	cwdFiles, err := c.collect()
 	// collect files from current directory
-	cwdFiles, err := ioutil.ReadDir("./")
 	if err != nil {
 		return &allbut{}, fmt.Errorf("error reading directory. err %v", err)
 	}
@@ -49,7 +80,7 @@ func Setup(args []string) (*allbut, error) {
 		return &allbut{}, err
 	}
 
-	deletionTargets := sanitizeFilenames(deletionCandidates)
+	deletionTargets := s.sanitizeFilenames(deletionCandidates)
 	return &allbut{
 		toDelete:      deletionTargets,
 		toProtect:     protectedFiles,
@@ -110,22 +141,6 @@ func addDotSlashPrefix(i string) string {
 	return fmt.Sprintf("./%s", s)
 }
 
-func sanitizeFilenames(files []string) []string {
-	r := []string{}
-	stripped := []string{}
-
-	for _, f := range files {
-		p := addDotSlashPrefix(f)
-		stripped = append(stripped, p)
-	}
-
-	for _, f := range stripped {
-		r = append(r, removeInvalidChars(f))
-	}
-
-	return r
-}
-
 func getDeleteConfirmation(count int) (bool, error) {
 	fmt.Printf("\n%d files will be deleted. Type [y] to proceed: ", count)
 	reader := bufio.NewReader(os.Stdin)
@@ -180,7 +195,8 @@ func (v *validator) Stat(f string) (os.FileInfo, error) {
 	return os.Stat(f)
 }
 
-func (v *validator) validate(file string) error {
+func (v *validator) validate(files []string) error {
+	for _, file := range files { 
 	f, err := v.Stat(file)
 	if err != nil {
 		return fmt.Errorf("unable to read file: %s", f)
@@ -189,6 +205,7 @@ func (v *validator) validate(file string) error {
 	if f.IsDir() {
 		return fmt.Errorf("%s is a directory, not a plain file", f.Name())
 	}
+}
 	return nil
 }
 
@@ -211,3 +228,5 @@ func parseArgs(args []string) ([]string, bool) {
 	}
 	return results, deletionEnabled
 }
+
+

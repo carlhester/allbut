@@ -37,6 +37,8 @@ func TestParseArgs(t *testing.T) {
 }
 
 func TestSanitizeFileNames(t *testing.T) {
+	s := sanitizer{}
+
 	tests := []struct {
 		descr  string
 		input  []string
@@ -48,7 +50,7 @@ func TestSanitizeFileNames(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.descr, func(t *testing.T) {
-			result := sanitizeFilenames(tt.input)
+			result := s.sanitizeFilenames(tt.input)
 			if !slicesEqual(result, tt.output) {
 				t.Errorf("Error.  Expected: [%s]. Got: [%s]", tt.output, result)
 			}
