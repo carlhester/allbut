@@ -3,7 +3,6 @@ package allbut
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -13,50 +12,36 @@ type allbut struct {
 	toDelete      []string
 	toProtect     []string
 	deleteEnabled bool
-
 }
 
-type app struct{
-p argParser
-	s sanitizer
-	v validator
-	c cwdCollector
+type app struct {
+	p parseArgser
+	s fileSanitizer
+	v fileValidator
+	c pathCollector
 }
 
-type cwdCollector struct { 
+type parseArgser interface {
+	parseArgs([]string) ([]string, bool)
 }
 
-func (c *cwdCollector) collect() ([]os.FileInfo, error) { 
-	return ioutil.ReadDir("./")
+type fileSanitizer interface {
+	sanitizeFilenames([]string) []string
 }
 
-type sanitizer struct {} 
-
-func (s *sanitizer) sanitizeFilenames(files []string) []string{ 
-	r := []string{}
-	stripped := []string{}
-
-	for _, f := range files {
-		p := addDotSlashPrefix(f)
-		stripped = append(stripped, p)
-	}
-
-	for _, f := range stripped {
-		r = append(r, removeInvalidChars(f))
-	}
-
-	return r
+type fileValidator interface {
+	validate([]string) error
 }
 
-type argParser struct {}
+type pathCollector interface {
+	collect() ([]os.FileInfo, error)
+}
 
-
-
-func New() *app{
-	p := argParser{}
-	s := sanitizer{}
-	v := validator{}
-	c := cwdCollector{}
+func New() *app {
+	p := &argParser{}
+	s := &sanitizer{}
+	v := &validator{}
+	c := &cwdCollector{}
 
 	return &app{
 		p: p,
@@ -66,7 +51,7 @@ func New() *app{
 	}
 }
 
-func (a *app)Setup(args []string) (*allbut, error) {
+func (a *app) Setup(args []string) (*allbut, error) {
 	protectionCandidates, deleteEnabled := a.p.parseArgs(args)
 	if len(protectionCandidates) == 0 {
 		return &allbut{}, fmt.Errorf("%d files to protect. Provide an argument", len(protectionCandidates))
@@ -78,12 +63,11 @@ func (a *app)Setup(args []string) (*allbut, error) {
 	if err != nil {
 		return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
 	}
-	
+
 	cwdFiles, err := a.c.collect()
 	if err != nil {
 		return &allbut{}, fmt.Errorf("error reading directory. err %v", err)
 	}
-	
 
 	deletionCandidates, err := identifyDeletionCandidates(protectedFiles, cwdFiles)
 	if err != nil {
@@ -198,45 +182,8 @@ func identifyDeletionCandidates(protectedFiles []string, filesInCwd []os.FileInf
 	return deletionCandidates, nil
 }
 
-type validator struct {
-}
-
-func (v *validator) Stat(f string) (os.FileInfo, error) {
-	return os.Stat(f)
-}
-
-func (v *validator) validate(files []string) error {
-	for _, file := range files { 
-	f, err := v.Stat(file)
-	if err != nil {
-		return fmt.Errorf("unable to read file: %s", f)
-	}
-
-	if f.IsDir() {
-		return fmt.Errorf("%s is a directory, not a plain file", f.Name())
-	}
-}
-	return nil
-}
-
 func PrintUsageAndExit() {
 	fmt.Println("allbut deletes everything except the files you name")
 	fmt.Println("usage: allbut [-f] filename1 [filename2 filename3 ...]")
 	os.Exit(1)
 }
-
-func (p *argParser)parseArgs(args []string) ([]string, bool) {
-	results := []string{}
-	deletionEnabled := false
-
-	for _, file := range args {
-		if file == "-f" {
-			deletionEnabled = true
-			continue
-		}
-		results = append(results, file)
-	}
-	return results, deletionEnabled
-}
-
-
