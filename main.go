@@ -8,12 +8,14 @@ import (
 )
 
 func main() {
-	app, err := allbut.Setup(os.Args[1:])
+	app := allbut.New()
+	ab, err := app.Setup(os.Args[1:])
 	if err != nil {
 		log.Println(err)
 		allbut.PrintUsageAndExit()
 	}
-	err = app.Run()
+
+	err = ab.Run()
 	if err != nil {
 		log.Println(err)
 		allbut.PrintUsageAndExit()

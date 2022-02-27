@@ -23,9 +23,11 @@ func TestParseArgs(t *testing.T) {
 		{"two files with multiple flags returns files with flag", []string{"-f", "-f", "testfile2", "testfile1", "-f"}, []string{"testfile2", "testfile1"}, true},
 	}
 
+	p:= argParser{}
+
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			res1, res2 := parseArgs(tt.input)
+			res1, res2 := p.parseArgs(tt.input)
 			if !slicesEqual(res1, tt.res1) {
 				t.Errorf("ERROR: got [%s], expected [%s]", res1, tt.res1)
 			}

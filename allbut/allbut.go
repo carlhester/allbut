@@ -13,6 +13,14 @@ type allbut struct {
 	toDelete      []string
 	toProtect     []string
 	deleteEnabled bool
+
+}
+
+type app struct{
+p argParser
+	s sanitizer
+	v validator
+	c cwdCollector
 }
 
 type cwdCollector struct { 
@@ -40,47 +48,49 @@ func (s *sanitizer) sanitizeFilenames(files []string) []string{
 	return r
 }
 
+type argParser struct {}
 
 
-func Setup(args []string) (*allbut, error) {
 
+func New() *app{
+	p := argParser{}
 	s := sanitizer{}
-//	p := parser{}
 	v := validator{}
 	c := cwdCollector{}
-	
 
-	// Parse input
-	// Strip the first argument which is the executable itself
-	protectionCandidates, deleteEnabled := parseArgs(args)
+	return &app{
+		p: p,
+		s: s,
+		v: v,
+		c: c,
+	}
+}
+
+func (a *app)Setup(args []string) (*allbut, error) {
+	protectionCandidates, deleteEnabled := a.p.parseArgs(args)
 	if len(protectionCandidates) == 0 {
 		return &allbut{}, fmt.Errorf("%d files to protect. Provide an argument", len(protectionCandidates))
 	}
 
-	// Sanitize filenames
-	sanitizedFiles := s.sanitizeFilenames(protectionCandidates)
-	protectedFiles := []string{}
+	protectedFiles := a.s.sanitizeFilenames(protectionCandidates)
 
-
-	err := v.validate(sanitizedFiles)
+	err := a.v.validate(protectedFiles)
 	if err != nil {
 		return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
 	}
-	protectedFiles = sanitizedFiles
-
-	cwdFiles, err := c.collect()
-	// collect files from current directory
+	
+	cwdFiles, err := a.c.collect()
 	if err != nil {
 		return &allbut{}, fmt.Errorf("error reading directory. err %v", err)
 	}
+	
 
-	// process files
 	deletionCandidates, err := identifyDeletionCandidates(protectedFiles, cwdFiles)
 	if err != nil {
 		return &allbut{}, err
 	}
 
-	deletionTargets := s.sanitizeFilenames(deletionCandidates)
+	deletionTargets := a.s.sanitizeFilenames(deletionCandidates)
 	return &allbut{
 		toDelete:      deletionTargets,
 		toProtect:     protectedFiles,
@@ -215,7 +225,7 @@ func PrintUsageAndExit() {
 	os.Exit(1)
 }
 
-func parseArgs(args []string) ([]string, bool) {
+func (p *argParser)parseArgs(args []string) ([]string, bool) {
 	results := []string{}
 	deletionEnabled := false
 
