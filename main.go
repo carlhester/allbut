@@ -9,6 +9,7 @@ import (
 
 func main() {
 	app := allbut.New()
+
 	ab, err := app.Setup(os.Args[1:])
 	if err != nil {
 		log.Println(err)

@@ -8,17 +8,17 @@ import (
 	"strings"
 )
 
-type allbut struct {
+type appEnv struct {
 	toDelete      []string
 	toProtect     []string
 	deleteEnabled bool
 }
 
 type app struct {
-	p parseArgser
-	s fileSanitizer
-	v fileValidator
-	c pathCollector
+	argParser    parseArgser
+	sanitizer    fileSanitizer
+	validator    fileValidator
+	cwdCollector pathCollector
 }
 
 type parseArgser interface {
@@ -44,45 +44,45 @@ func New() *app {
 	c := &cwdCollector{}
 
 	return &app{
-		p: p,
-		s: s,
-		v: v,
-		c: c,
+		argParser:    p,
+		sanitizer:    s,
+		validator:    v,
+		cwdCollector: c,
 	}
 }
 
-func (a *app) Setup(args []string) (*allbut, error) {
-	protectionCandidates, deleteEnabled := a.p.parseArgs(args)
+func (a *app) Setup(args []string) (*appEnv, error) {
+	protectionCandidates, deleteEnabled := a.argParser.parseArgs(args)
 	if len(protectionCandidates) == 0 {
-		return &allbut{}, fmt.Errorf("%d files to protect. Provide an argument", len(protectionCandidates))
+		return nil, fmt.Errorf("%d files to protect. Provide an argument", len(protectionCandidates))
 	}
 
-	protectedFiles := a.s.sanitizeFilenames(protectionCandidates)
+	protectedFiles := a.sanitizer.sanitizeFilenames(protectionCandidates)
 
-	err := a.v.validate(protectedFiles)
+	err := a.validator.validate(protectedFiles)
 	if err != nil {
-		return &allbut{}, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
+		return nil, fmt.Errorf("error validating protected files: [%s]. err %v", protectedFiles, err)
 	}
 
-	cwdFiles, err := a.c.collect()
+	cwdFiles, err := a.cwdCollector.collect()
 	if err != nil {
-		return &allbut{}, fmt.Errorf("error reading directory. err %v", err)
+		return nil, fmt.Errorf("error reading directory. err %v", err)
 	}
 
 	deletionCandidates, err := identifyDeletionCandidates(protectedFiles, cwdFiles)
 	if err != nil {
-		return &allbut{}, err
+		return nil, err
 	}
 
-	deletionTargets := a.s.sanitizeFilenames(deletionCandidates)
-	return &allbut{
+	deletionTargets := a.sanitizer.sanitizeFilenames(deletionCandidates)
+	return &appEnv{
 		toDelete:      deletionTargets,
 		toProtect:     protectedFiles,
 		deleteEnabled: deleteEnabled,
 	}, nil
 }
 
-func (a *allbut) Run() error {
+func (a *appEnv) Run() error {
 	if a.deleteEnabled {
 		err := handleDeletions(a.toDelete, a.deleteEnabled)
 		if err != nil {
@@ -99,8 +99,11 @@ func (a *allbut) Run() error {
 		}
 
 		fmt.Printf("\nFiles to Delete:\n")
-		for _, d := range a.toDelete {
-			fmt.Printf("\t%s\n", d)
+		for i, d := range a.toDelete {
+			if i%3 == 0 {
+				fmt.Println()
+			}
+			fmt.Printf("\t%16s", d)
 		}
 	}()
 
