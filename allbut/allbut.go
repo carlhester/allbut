@@ -92,20 +92,10 @@ func (a *appEnv) Run() error {
 	}
 
 	// print status
-	func() {
-		fmt.Printf("\nProtected Files:\n")
-		for _, s := range a.toProtect {
-			fmt.Printf("\t%s\n", s)
-		}
-
-		fmt.Printf("\nFiles to Delete:\n")
-		for i, d := range a.toDelete {
-			if i%3 == 0 {
-				fmt.Println()
-			}
-			fmt.Printf("\t%16s", d)
-		}
-	}()
+	fmt.Printf("\nProtected Files:\n")
+	for _, s := range a.toProtect {
+		fmt.Printf("\t%s\n", s)
+	}
 
 	// Get confirmation
 	deleteConfirmation, err := getDeleteConfirmation(len(a.toDelete))
@@ -152,17 +142,20 @@ func getDeleteConfirmation(count int) (bool, error) {
 }
 
 func handleDeletions(candidates []string, deletionEnabled bool) error {
+	deletedCount := 0
 	for _, c := range candidates {
 		if deletionEnabled {
 			err := os.Remove(c)
+			deletedCount++
 			if err != nil {
-				panic(err)
+				return fmt.Errorf("error deleting file: %s. err: %+v", c, err)
 			}
 			continue
 		}
 		fmt.Println("(use -f to really delete) MOCK deleting ", c)
 
 	}
+	fmt.Printf("%d files deleted.\n", deletedCount)
 	return nil
 }
 
